@@ -1,0 +1,30 @@
+# Backend (C#)
+Backend/bin/
+Backend/obj/
+Backend/config.json
+Backend/*.user
+Backend/.vs/
+
+# Frontend
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db

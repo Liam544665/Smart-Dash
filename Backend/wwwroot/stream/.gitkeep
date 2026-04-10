@@ -1,0 +1,2 @@
+# This file ensures the stream directory exists
+# HLS segments (.m3u8 and .ts files) are generated here by FFmpeg at runtime
