@@ -1,0 +1,23 @@
+VIDEO FOOTAGE DISCLAIMER
+========================
+
+COPYRIGHT & OWNERSHIP:
+All video files contained in this directory are the exclusive property of the owner of this SmartDash installation.
+
+SOURCE:
+These recordings originate from a privately-owned UniFi G5 Pro security camera system operated by the owner.
+
+PERMITTED USE:
+These video files are authorized for use EXCLUSIVELY within the SmartDash project for demonstration and testing purposes.
+
+RESTRICTIONS:
+- Unauthorized distribution, reproduction, or use outside of the SmartDash project is strictly prohibited
+- These recordings may not be shared, published, or transmitted to third parties
+- Commercial use of these recordings is not permitted
+
+PRIVACY NOTICE:
+These recordings may contain footage from private property. All rights reserved.
+
+---
+Project: SmartDash - IoT Dashboard
+Camera: UniFi G5 Pro (RTSPS)

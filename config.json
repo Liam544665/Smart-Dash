@@ -1,0 +1,12 @@
+{
+  "Aranet": {
+    "Mode": "simulated"
+  },
+  "Plug": {
+    "Mode": "simulated"
+  },
+  "Camera": {
+    "Mode": "live",
+    "StreamUrl": "rtsps://192.168.9.1:7441/HoAyf5vM2YP6Pgax?enableSrtp"
+  }
+}

@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Dash - IoT Dashboard</title>
+    
+    <!-- HLS.js for camera streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --bg-light: #f7fafc;
+            --text-dark: #1a202c;
+            --border: #e2e8f0;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-dark);
+        }
+        
+        /* Navigation */
+        .navbar {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .user-menu {
+            position: relative;
+        }
+        
+        .user-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+        }
+        
+        .user-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            min-width: 200px;
+            display: none;
+        }
+        
+        .dropdown.show { display: block; }
+        
+        .dropdown-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            color: var(--text-dark);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item:hover { background: var(--bg-light); }
+        
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        /* Device Grid */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        /* Device Cards */
+        .device-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .device-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px var(--shadow);
+        }
+        
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .device-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .device-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .status-online { background: #d1fae5; color: var(--success); }
+        .status-offline { background: #fee2e2; color: var(--danger); }
+        .status-warning { background: #fef3c7; color: var(--warning); }
+        
+        /* Sensor Readings (Aranet4) */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        
+        .sensor-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+        
+        .sensor-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0.5rem 0;
+        }
+        
+        .sensor-label {
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .sensor-unit {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        /* Smart Plug Controls */
+        .plug-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .power-display {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+        
+        .power-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .power-state {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .power-consumption {
+            font-size: 1rem;
+            color: #666;
+        }
+        
+        /* Camera Card */
+        .camera-preview {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+        
+        .camera-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1rem;
+        }
+        
+        .camera-stat {
+            text-align: center;
+        }
+        
+        .camera-stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .camera-stat-label {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        /* System Card */
+        .system-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-light);
+            border-radius: 6px;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+        
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show { display: flex; }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-footer {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+        
+        /* Forms */
+        .form-group { margin-bottom: 1.5rem; }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .device-grid { grid-template-columns: 1fr; }
+            .sensor-grid { grid-template-columns: 1fr; }
+        }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen">
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div style="background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; width: 90%;">
+                <h1 style="text-align: center; margin-bottom: 0.5rem;">🏠 Smart Dash</h1>
+                <p style="text-align: center; color: #666; margin-bottom: 2rem;">IoT Control Dashboard</p>
+                
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" id="loginUsername" class="form-input" placeholder="admin">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="Password">
+                </div>
+                
+                <button class="btn btn-primary" onclick="login()">Login</button>
+                
+                <div id="loginError" class="hidden" style="margin-top: 1rem; padding: 1rem; background: #fee2e2; color: #ef4444; border-radius: 6px; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardScreen" class="hidden">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="navbar-brand">🏠 Smart Dash</div>
+            <div class="user-menu">
+                <button class="user-button" onclick="toggleUserMenu()">
+                    <span id="currentUser">User</span> ▼
+                </button>
+                <div id="userDropdown" class="dropdown">
+                    <div class="dropdown-item" onclick="showProfile()">👤 Profile</div>
+                    <div class="dropdown-item" onclick="showSettings()">⚙️ Settings</div>
+                    <div class="dropdown-item" onclick="logout()" style="color: #ef4444;">🚪 Logout</div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <div class="container">
+            <!-- Device Grid - 4 Device Cards -->
+            <div class="device-grid">
+                
+                <!-- DEVICE 1: Aranet4 Sensor -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div class="device-title">💨 Aranet4 Sensor</div>
+                        <div id="aranetStatus" class="device-status status-warning">Simulated</div>
+                    </div>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-label">CO2</div>
+                            <div class="sensor-value" id="co2Value">--</div>
+                            <div class="sensor-unit">ppm</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-label">Temperature</div>
+                            <div class="sensor-value" id="tempValue">--</div>
+                            <div class="sensor-unit">°C</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-label">Humidity</div>
+                            <div class="sensor-value" id="humidityValue">--</div>
+                            <div class="sensor-unit">%</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-label">Pressure</div>
+                            <div class="sensor-value" id="pressureValue">--</div>
+                            <div class="sensor-unit">hPa</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Aranet4 Mode Controls -->
+                    <div style="margin-top: 1rem; padding: 1rem; background: #f7fafc; border-radius: 8px;">
+                        <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">Mode:</div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="aranetSimBtn" class="btn" onclick="changeDeviceMode('aranet', 'simulated')" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;">
+                                Simulated
+                            </button>
+                            <button id="aranetLiveBtn" class="btn" onclick="alert('⚠️ LIVE mode disabled - Windows BLE limitation')" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; opacity: 0.3;" disabled>
+                                LIVE
+                            </button>
+                        </div>
+                        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #666; text-align: center;">
+                            🚫 Windows BLE limitations prevent LIVE mode
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- DEVICE 2: Smart Plug -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div class="device-title">🔌 Smart Plug</div>
+                        <div id="plugStatus" class="device-status status-warning">Simulated Mode (Demo)</div>
+                    </div>
+                    <div class="plug-controls">
+                        <div class="power-display">
+                            <div class="power-icon" id="plugIcon">⚫</div>
+                            <div class="power-state" id="plugState">OFF</div>
+                            <div class="power-consumption" id="plugPower">0 W</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="togglePlug()">Toggle Power</button>
+                    </div>
+                </div>
+                
+                <!-- DEVICE 3: Security Camera -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div class="device-title">📹 Security Camera</div>
+                        <div id="cameraStatus" class="device-status status-warning">
+                            Simulated Mode (Demo)
+                        </div>
+                    </div>
+                    
+                    <!-- Video Player -->
+                    <div style="position: relative;">
+                        <video id="cameraVideo" 
+                               style="width: 100%; height: 240px; object-fit: cover; border-radius: 8px; background: #000;"
+                               autoplay 
+                               loop 
+                               muted>
+                            <source id="videoSource" src="/videos/traffic-sim.mp4" type="video/mp4">
+                            Your browser doesn't support video playback.
+                        </video>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="refreshCamera()" style="margin-top: 1rem;">
+                        🔄 Refresh Camera
+                    </button>
+                </div>
+                
+                <!-- DEVICE 4: System Status -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div class="device-title">⚙️ System Status</div>
+                        <div id="systemStatus" class="device-status status-online">Running</div>
+                    </div>
+                    <div class="system-stats">
+                        <div class="stat-row">
+                            <span class="stat-label">System Mode</span>
+                            <span class="stat-value" id="systemMode">Simulated</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Connected Devices</span>
+                            <span class="stat-value" id="deviceCount">3</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Last Update</span>
+                            <span class="stat-value" id="lastUpdate">--</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Uptime</span>
+                            <span class="stat-value" id="uptime">--</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="refreshAll()" style="margin-top: 1rem;">Refresh All Devices</button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">👤 User Profile</div>
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" id="profileUsername" class="form-input" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="text" id="profileEmail" class="form-input" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Role</label>
+                <input type="text" id="profileRole" class="form-input" readonly>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeProfile()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">⚙️ Settings</div>
+            
+            <div style="padding: 1rem; background: #e0f2fe; border-left: 4px solid #3b82f6; border-radius: 6px; margin-bottom: 1.5rem;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem;">📱 Device Modes</div>
+                <div style="font-size: 0.9rem; color: #1e40af;">
+                    Each device now has its own Live/Simulated toggle in its card. Configure modes individually on each device.
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">📹 Camera Stream URL</label>
+                <input type="text" id="cameraStreamUrl" class="form-input" placeholder="rtsps://username:password@camera-ip:7447/camera-id">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
+                    Enter your camera stream URL (RTSPS, RTSP, or RTMP supported)
+                </div>
+                <button class="btn btn-primary" onclick="saveCameraUrl()" style="margin-top: 0.5rem; width: 100%;">
+                    Save Camera URL
+                </button>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">🔄 go2rtc Server URL</label>
+                <input type="text" id="go2rtcUrl" class="form-input" placeholder="http://localhost:8555" value="http://localhost:8555">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
+                    Enter your go2rtc server URL (WebRTC endpoint for live camera streaming)
+                </div>
+                <button class="btn btn-primary" onclick="saveGo2rtcUrl()" style="margin-top: 0.5rem; width: 100%;">
+                    Save go2rtc URL
+                </button>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">📺 Stream Name in go2rtc</label>
+                <input type="text" id="streamName" class="form-input" placeholder="camera" value="camera">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
+                    Stream name configured in your go2rtc.yaml (default: "camera")
+                </div>
+                <button class="btn btn-primary" onclick="saveStreamName()" style="margin-top: 0.5rem; width: 100%;">
+                    Save Stream Name
+                </button>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Auto Refresh</label>
+                <select id="refreshInterval" class="form-input" onchange="updateRefreshInterval()">
+                    <option value="5">Every 5 seconds</option>
+                    <option value="10" selected>Every 10 seconds</option>
+                    <option value="30">Every 30 seconds</option>
+                    <option value="0">Disabled</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeSettings()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let token = localStorage.getItem('token') || '';
+        let currentUser = null;
+        let refreshTimer = null;
+        let refreshInterval = 10000;
+        let startTime = Date.now();
+        const API_BASE = '/api';
+        
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                // Don't show error on initial load - just clear invalid tokens silently
+                loadUserProfile(false).then(success => {
+                    if (success) {
+                        showDashboard();
+                        startAutoRefresh();
+                    } else {
+                        // Clear invalid token
+                        localStorage.removeItem('token');
+                        token = '';
+                        showLogin();
+                    }
+                });
+            } else showLogin();
+        });
+        
+        // API Helper
+        async function apiCall(endpoint, method = 'GET', body = null, showError = true) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            };
+            if (body) options.body = JSON.stringify(body);
+            
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                if (response.status === 401) {
+                    if (showError) {
+                        const errorDiv = document.getElementById('loginError');
+                        if (errorDiv) {
+                            errorDiv.textContent = 'Session expired. Please login again.';
+                            errorDiv.classList.remove('hidden');
+                        }
+                    }
+                    showLogin();
+                    return { ok: false, error: 'Session expired' };
+                }
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return { ok: false, error: errorText };
+                }
+                const data = await response.json();
+                return { ok: true, data };
+            } catch (error) {
+                return { ok: false, error: error.message };
+            }
+        }
+        
+        // Helper function to get authentication headers
+        function getAuthHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+        
+        // Authentication
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!username || !password) {
+                errorDiv.textContent = 'Please enter username and password';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            const result = await apiCall('/auth/login', 'POST', { username, password });
+            
+            if (result.ok && result.data.token) {
+                token = result.data.token;
+                localStorage.setItem('token', token);
+                currentUser = result.data.user;
+                errorDiv.classList.add('hidden');
+                showDashboard();
+                startAutoRefresh();
+            } else {
+                errorDiv.textContent = result.error || 'Login failed';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+        
+        async function logout() {
+            await apiCall('/auth/logout', 'POST');
+            token = '';
+            currentUser = null;
+            localStorage.removeItem('token');
+            stopAutoRefresh();
+            showLogin();
+        }
+        
+        async function loadUserProfile(showError = false) {
+            const result = await apiCall('/auth/me', 'GET', null, showError);
+            if (result.ok) {
+                currentUser = result.data;
+                document.getElementById('currentUser').textContent = currentUser.username;
+                return true;
+            }
+            return false;
+        }
+        
+        // Device Refresh Functions
+        async function refreshSensor() {
+            const result = await apiCall('/sensor/readings');
+            if (result.ok && result.data) {
+                document.getElementById('co2Value').textContent = result.data.co2 || '--';
+                document.getElementById('tempValue').textContent = result.data.temperature || '--';
+                document.getElementById('humidityValue').textContent = result.data.humidity || '--';
+                document.getElementById('pressureValue').textContent = result.data.pressure || '--';
+            }
+        }
+        
+        async function refreshPlug() {
+            const result = await apiCall('/plug/status');
+            if (result.ok && result.data) {
+                const isOn = result.data.isOn;
+                document.getElementById('plugState').textContent = isOn ? 'ON' : 'OFF';
+                document.getElementById('plugIcon').textContent = isOn ? '🟢' : '⚫';
+                document.getElementById('plugStatus').textContent = isOn ? 'On' : 'Off';
+                document.getElementById('plugStatus').className = 'device-status ' + (isOn ? 'status-online' : 'status-offline');
+                document.getElementById('plugPower').textContent = (result.data.powerUsage || 0) + ' W';
+            }
+        }
+        
+        async function togglePlug() {
+            const result = await apiCall('/plug/toggle', 'POST');
+            if (result.ok) refreshPlug();
+        }
+        
+        // =============================================================================
+        // CAMERA: Simulated Mode (Production)
+        // =============================================================================
+        // Honours Project Demo: Random UniFi G5 Pro recordings
+        // See /Docs/WEBRTC_RESEARCH.md for live streaming research
+        
+        async function refreshCamera() {
+            const result = await apiCall('/camera/snapshot');
+            if (result.ok && result.data) {
+                const video = document.getElementById('cameraVideo');
+                const source = document.getElementById('videoSource');
+                
+                // Simulated mode - play random MP4 from backend
+                if (source.src !== result.data.streamUrl) {
+                    source.src = result.data.streamUrl;
+                    video.load();
+                    video.play().catch(e => console.warn('Auto-play prevented:', e));
+                }
+            }
+        }
+        
+        // =============================================================================
+        // EXPERIMENTAL: Live Streaming Code (Disabled - Future Implementation)
+        // =============================================================================
+        // STATUS: Research complete, implementation deferred post-graduation
+        // DOCUMENTATION: See /Docs/WEBRTC_RESEARCH.md for complete technical analysis
+        // 
+        // This code represents experimental work on live camera streaming using:
+        // 1. FFmpeg + HLS (5-30s latency) - Initially implemented
+        // 2. WebRTC (sub-second latency) - Researched for future implementation
+        //
+        // Backend services (StreamingService.cs, StreamController.cs) removed.
+        // Frontend kept as documentation of experimentation and technical research.
+        // =============================================================================
+        
+        /*
+        // EXPERIMENTAL: FFmpeg + HLS Streaming (Implemented but disabled)
+        async function startLiveStream(streamUrl) {
+            stopAllStreams();
+            const video = document.getElementById('cameraVideo');
+            
+            try {
+                console.log('🎥 Starting FFmpeg stream...');
+                const response = await fetch('/api/stream/start', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) throw new Error('Failed to start stream');
+                
+                const data = await response.json();
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                const hlsUrl = '/stream/stream.m3u8';
+                await connectHLS(video, hlsUrl);
+                
+            } catch (error) {
+                console.error('❌ Streaming error:', error);
+            }
+        }
+        
+        // EXPERIMENTAL: WebRTC Peer Connection (Researched for future)
+        // Provides <1s latency vs 5-30s with HLS
+        // Requires go2rtc server or custom signaling backend
+        async function connectWebRTC(video, go2rtcUrl, streamName) {
+            return new Promise((resolve, reject) => {
+                const webrtcUrl = `${go2rtcUrl}/api/ws?src=${streamName}`;
+                const pc = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                
+                pc.ontrack = (event) => {
+                    video.srcObject = event.streams[0];
+                    video.play();
+                    resolve();
+                };
+                
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === 'failed') {
+                        reject(new Error('WebRTC ICE connection failed'));
+                    }
+                };
+                
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                
+                pc.createOffer().then(offer => pc.setLocalDescription(offer))
+                  .then(() => {
+                      const ws = new WebSocket(webrtcUrl);
+                      ws.onopen = () => ws.send(JSON.stringify(pc.localDescription));
+                      ws.onmessage = (event) => {
+                          pc.setRemoteDescription(JSON.parse(event.data));
+                          ws.close();
+                      };
+                      ws.onerror = () => reject(new Error('WebSocket connection failed'));
+                  }).catch(reject);
+                
+                setTimeout(() => reject(new Error('WebRTC connection timeout')), 5000);
+            });
+        }
+        
+        // EXPERIMENTAL: HLS.js Connection (FFmpeg backend)
+        async function connectHLS(video, hlsUrl) {
+            return new Promise((resolve, reject) => {
+                if (Hls.isSupported()) {
+                    const hls = new Hls({
+                        debug: false,
+                        enableWorker: true,
+                        lowLatencyMode: true
+                    });
+                    hls.loadSource(hlsUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play();
+                        resolve();
+                    });
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) reject(new Error(`HLS error: ${data.type}`));
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = hlsUrl;
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play();
+                        resolve();
+                    });
+                } else {
+                    reject(new Error('HLS not supported'));
+                }
+                
+                setTimeout(() => reject(new Error('HLS timeout')), 15000);
+            });
+        }
+        
+        function stopAllStreams() {
+            // Cleanup function for stopping FFmpeg/WebRTC streams
+            // Not used in current simulated-only implementation
+        }
+        */
+        
+        function updateSystemStats() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('uptime').textContent = `${minutes}m ${seconds}s`;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+        
+        async function refreshAll() {
+            await Promise.all([refreshSensor(), refreshPlug(), refreshCamera()]);
+            updateSystemStats();
+        }
+        
+        // Auto Refresh
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            refreshAll();
+            if (refreshInterval > 0) {
+                refreshTimer = setInterval(refreshAll, refreshInterval);
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+        
+        function updateRefreshInterval() {
+            const select = document.getElementById('refreshInterval');
+            refreshInterval = parseInt(select.value) * 1000;
+            startAutoRefresh();
+        }
+        
+        // UI Controls
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+        }
+        
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboardScreen').classList.remove('hidden');
+        }
+        
+        function toggleUserMenu() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+        
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-menu')) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+        
+        function showProfile() {
+            document.getElementById('userDropdown').classList.remove('show');
+            if (currentUser) {
+                document.getElementById('profileUsername').value = currentUser.username;
+                document.getElementById('profileEmail').value = currentUser.email;
+                document.getElementById('profileRole').value = currentUser.role;
+            }
+            document.getElementById('profileModal').classList.add('show');
+        }
+        
+        function closeProfile() {
+            document.getElementById('profileModal').classList.remove('show');
+        }
+        
+        function showSettings() {
+            document.getElementById('userDropdown').classList.remove('show');
+            loadCameraUrl(); // Load current camera URL
+            loadGo2rtcUrl(); // Load current go2rtc URL
+            loadStreamName(); // Load current stream name
+            document.getElementById('settingsModal').classList.add('show');
+        }
+        
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('show');
+        }
+        
+        // Camera URL Management
+        async function loadCameraUrl() {
+            const result = await apiCall('/config');
+            if (result.ok && result.data) {
+                const url = result.data.camera?.streamUrl || '';
+                document.getElementById('cameraStreamUrl').value = url;
+            }
+        }
+        
+        async function saveCameraUrl() {
+            const url = document.getElementById('cameraStreamUrl').value.trim();
+            if (!url) {
+                alert('⚠️ Please enter a camera stream URL');
+                return;
+            }
+            
+            const result = await apiCall('/config/camera-url', 'POST', { url });
+            if (result.ok) {
+                alert('✅ Camera stream URL saved successfully!');
+            } else {
+                alert('❌ Failed to save camera URL');
+            }
+        }
+        
+        // go2rtc URL Management
+        function loadGo2rtcUrl() {
+            const url = localStorage.getItem('go2rtcUrl') || 'http://localhost:8555';
+            document.getElementById('go2rtcUrl').value = url;
+        }
+        
+        function saveGo2rtcUrl() {
+            const url = document.getElementById('go2rtcUrl').value.trim();
+            if (!url) {
+                alert('⚠️ Please enter a go2rtc server URL');
+                return;
+            }
+            
+            localStorage.setItem('go2rtcUrl', url);
+            alert('✅ go2rtc server URL saved successfully!');
+        }
+        
+        // Stream Name Management
+        function loadStreamName() {
+            const name = localStorage.getItem('streamName') || 'camera';
+            document.getElementById('streamName').value = name;
+        }
+        
+        function saveStreamName() {
+            const name = document.getElementById('streamName').value.trim();
+            if (!name) {
+                alert('⚠️ Please enter a stream name');
+                return;
+            }
+            
+            localStorage.setItem('streamName', name);
+            alert('✅ Stream name saved successfully!');
+        }
+        
+        // Per-Device Mode Control
+        async function changeDeviceMode(device, mode) {
+            const result = await apiCall('/config/device-mode', 'POST', { device, mode });
+            if (result.ok) {
+                // Update device status badge
+                const statusMap = {
+                    'aranet': 'aranetStatus',
+                    'plug': 'plugStatus',
+                    'camera': 'cameraStatus'
+                };
+                
+                const statusBadge = document.getElementById(statusMap[device]);
+                if (statusBadge) {
+                    const modeText = mode === 'live' ? 'Live' : 'Simulated';
+                    const statusClass = mode === 'live' ? 'status-online' : 'status-warning';
+                    
+                    // Update based on device type
+                    if (device === 'aranet' || device === 'camera') {
+                        statusBadge.querySelector('span').textContent = modeText;
+                        statusBadge.className = 'device-status ' + statusClass;
+                    }
+                }
+                
+                // Update button states
+                const simBtn = document.getElementById(`${device}SimBtn`);
+                const liveBtn = document.getElementById(`${device}LiveBtn`);
+                
+                if (simBtn && liveBtn) {
+                    if (mode === 'simulated') {
+                        simBtn.style.background = 'linear-gradient(135deg, #667eea, #5a67d8)';
+                        simBtn.style.color = 'white';
+                        liveBtn.style.background = '';
+                        liveBtn.style.color = '';
+                    } else {
+                        liveBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                        liveBtn.style.color = 'white';
+                        simBtn.style.background = '';
+                        simBtn.style.color = '';
+                    }
+                }
+                
+                // Refresh the specific device
+                if (device === 'aranet') refreshSensor();
+                if (device === 'plug') refreshPlug();
+                if (device === 'camera') refreshCamera();
+            }
+        }
+        
+        // Enter key support
+        document.getElementById('loginUsername')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        document.getElementById('loginPassword')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+    </script>
+</body>
+</html>
